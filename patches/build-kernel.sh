@@ -34,9 +34,10 @@ export CROSS_COMPILE=aarch64-linux-gnu-
 CLANG_PREBUILTS_PATH=/usr/
 echo "   CLANG_PREBUILTS_PATH=${CLANG_PREBUILTS_PATH}"
 
-echo "== configure (vendor defconfig)"
+echo "== configure (device config from /proc/config.gz)"
 mkdir -p "${OUT_DIR}"
-make ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" merge_kirin9000_defconfig
+cp patches/device_defconfig "${OUT_DIR}/.config"
+make ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" olddefconfig
 
 echo "== build"
 make -j"${JOBS}" ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" Image.gz Image
