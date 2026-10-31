@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Build HUAWEI_Kirin9000_Kernel (5.10.43) with the HarmonyOS port patches.
 #
-# The vendor makefiles branch on *make variables* named CONFIG_* (not only on
-# .config), which select the modem include paths. Huawei's own build wrapper
-# exports the .config symbols into the environment before calling make, so we do
-# the same; without it several headers look "missing".
+# Notes:
+#  * the vendor makefiles branch on make variables named CONFIG_* -> export them
+#  * the modem sources are entered through drivers/platform_drivers/, which does
+#    not carry the per-driver -I flags of makefile_soc_modem.mk, so those include
+#    directories are passed through KCFLAGS
+#  * espe/espe_entry_hook.c is not part of the published tree -> disable
+#    CONFIG_BALONG_ESPE
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,12 +39,26 @@ echo "== configure (vendor defconfig)"
 mkdir -p "${OUT_DIR}"
 make ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" merge_kirin9000_defconfig
 
-echo "== export CONFIG_* as make variables (vendor build wrapper behaviour)"
+echo "== adjust config"
+scripts/config --file "${OUT_DIR}/.config" -d BALONG_ESPE || true
+make ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" olddefconfig
+
+echo "== export CONFIG_* as make variables"
 # shellcheck disable=SC2046
 export $(grep -E '^CONFIG_[A-Za-z0-9_]+=y$' "${OUT_DIR}/.config" | tr -d '\r')
 
+MODEM_INC="-Idrivers/hisi/modem/drv/icc \
+ -Idrivers/hisi/modem/drv/balong_timer \
+ -Idrivers/hisi/modem/drv/hds \
+ -Idrivers/hisi/modem/drv/diag/cpm \
+ -Idrivers/hisi/tzdriver \
+ -Idrivers/hisi/modem/drv/include"
+
 echo "== build"
-make -j"${JOBS}" ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" Image.gz Image
+make -j"${JOBS}" ARCH=arm64 O="${OUT_DIR}" \
+     CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" \
+     KCFLAGS="${MODEM_INC}" \
+     Image.gz Image
 
 echo "== artifacts"
 ls -l "${OUT_DIR}/arch/arm64/boot/Image.gz" "${OUT_DIR}/arch/arm64/boot/Image" 2>/dev/null || true
