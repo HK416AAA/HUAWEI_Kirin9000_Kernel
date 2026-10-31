@@ -36,7 +36,7 @@ echo "   CLANG_PREBUILTS_PATH=${CLANG_PREBUILTS_PATH}"
 
 echo "== configure (vendor defconfig)"
 mkdir -p "${OUT_DIR}"
-make ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" merge_baltimore_defconfig
+make ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" merge_kirin9000_defconfig
 
 echo "== build"
 make -j"${JOBS}" ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" Image.gz Image
