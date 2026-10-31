@@ -1,40 +1,48 @@
 #!/usr/bin/env bash
-# Build the WGR-AN19 (Kirin 9000) 5.10.43 kernel with the two port patches.
-# Runs inside GitHub Actions (ubuntu-22.04); can also be used locally on Linux.
+# Build the HUAWEI_Kirin9000_Kernel (5.10.43) with the two port patches.
+# Vendor flow: make ARCH=arm64 O=out merge_baltimore_defconfig && make -j
 set -euo pipefail
 
-KERNEL_DIR="${KERNEL_DIR:-kernel}"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "${REPO_ROOT}"
+
 OUT_DIR="${OUT_DIR:-out}"
 JOBS="${JOBS:-$(nproc)}"
+PATCHES="patches"
 
-echo "== kernel tree: ${KERNEL_DIR}"
-cd "${KERNEL_DIR}"
-
+echo "== repo: ${REPO_ROOT}"
 echo "== applying port patches"
-for p in ../patches/0001-binder-async-sender-pid.patch \
-         ../patches/0002-rdr-no-ap-reset.patch; do
+for p in "${PATCHES}/0001-binder-async-sender-pid.patch" \
+         "${PATCHES}/0002-rdr-no-ap-reset.patch"; do
     if git apply --check "$p" 2>/dev/null; then
-        git apply "$p"
-        echo "   applied $(basename "$p")"
-    elif patch -p1 --dry-run < "$p" >/dev/null 2>&1; then
-        patch -p1 < "$p"
-        echo "   applied $(basename "$p") (patch -p1)"
+        git apply "$p"; echo "   applied $(basename "$p")"
+    elif patch -p1 --forward --dry-run < "$p" >/dev/null 2>&1; then
+        patch -p1 --forward < "$p"; echo "   applied $(basename "$p") (patch)"
     else
-        echo "!! cannot apply $(basename "$p") — already applied?"
+        echo "   !! $(basename "$p") not applied (already?)"
     fi
 done
 
-echo "== configuring"
-cp ../patches/device_defconfig arch/arm64/configs/wgr_defconfig
-make ARCH=arm64 O="${OUT_DIR}" wgr_defconfig
-make ARCH=arm64 O="${OUT_DIR}" olddefconfig
+echo "== toolchain"
+clang --version | head -1
+export PATH="${PATH}:/usr/bin"
+export CROSS_COMPILE=aarch64-linux-gnu-
+export CC=clang
+export LD=ld.lld
+export AR=llvm-ar
+export NM=llvm-nm
+export OBJCOPY=llvm-objcopy
+export OBJDUMP=llvm-objdump
+export STRIP=llvm-strip
+export READELF=llvm-readelf
 
-echo "== building"
-make -j"${JOBS}" ARCH=arm64 O="${OUT_DIR}" \
-    CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy \
-    OBJDUMP=llvm-objdump STRIP=llvm-strip READELF=llvm-readelf \
-    HOSTCC=clang HOSTCXX=clang++ \
-    Image Image.lz4
+echo "== configure (vendor defconfig)"
+mkdir -p "${OUT_DIR}"
+make ARCH=arm64 O="${OUT_DIR}" merge_baltimore_defconfig
+
+echo "== build"
+make -j"${JOBS}" ARCH=arm64 O="${OUT_DIR}" Image.gz Image
 
 echo "== artifacts"
-ls -l "${OUT_DIR}/arch/arm64/boot/Image" "${OUT_DIR}/arch/arm64/boot/Image.lz4" || true
+ls -l "${OUT_DIR}/arch/arm64/boot/Image.gz" "${OUT_DIR}/arch/arm64/boot/Image" 2>/dev/null || true
+grep -E "CONFIG_BINDER_TRANSACTION_PROC_BRIEF|CONFIG_ANDROID_BINDER_IPC" "${OUT_DIR}/.config" || true
