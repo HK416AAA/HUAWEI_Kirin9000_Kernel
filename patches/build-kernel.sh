@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Build HUAWEI_Kirin9000_Kernel (5.10.43) with the two port patches.
-# The vendor Makefile hardcodes a prebuilt clang path; it is overridable via
-# CLANG_PREBUILTS_PATH, so we point it at the CI toolchain.
+# Build HUAWEI_Kirin9000_Kernel (5.10.43) with the HarmonyOS port patches.
+#
+# The vendor makefiles branch on *make variables* named CONFIG_* (not only on
+# .config), which select the modem include paths. Huawei's own build wrapper
+# exports the .config symbols into the environment before calling make, so we do
+# the same; without it several headers look "missing".
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,22 +25,20 @@ for p in patches/0001-binder-async-sender-pid.patch patches/0002-rdr-no-ap-reset
 done
 
 echo "== toolchain wiring"
-if [ ! -e /usr/bin/llvm-ar ]; then sudo ln -sf /usr/bin/llvm-ar-12 /usr/bin/llvm-ar; fi
-if [ ! -e /usr/bin/llvm-nm ]; then sudo ln -sf /usr/bin/llvm-nm-12 /usr/bin/llvm-nm; fi
-if [ ! -e /usr/bin/llvm-objcopy ]; then sudo ln -sf /usr/bin/llvm-objcopy-12 /usr/bin/llvm-objcopy; fi
-if [ ! -e /usr/bin/llvm-objdump ]; then sudo ln -sf /usr/bin/llvm-objdump-12 /usr/bin/llvm-objdump; fi
-if [ ! -e /usr/bin/llvm-readelf ]; then sudo ln -sf /usr/bin/llvm-readelf-12 /usr/bin/llvm-readelf; fi
-if [ ! -e /usr/bin/llvm-strip ]; then sudo ln -sf /usr/bin/llvm-strip-12 /usr/bin/llvm-strip; fi
 if [ ! -e /usr/bin/clang++ ]; then sudo ln -sf /usr/bin/clang++-12 /usr/bin/clang++; fi
-
+for t in llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-readelf llvm-strip; do
+    if [ ! -e "/usr/bin/$t" ]; then sudo ln -sf "/usr/bin/$t-12" "/usr/bin/$t"; fi
+done
 export CROSS_COMPILE=aarch64-linux-gnu-
 CLANG_PREBUILTS_PATH=/usr/
-echo "   CLANG_PREBUILTS_PATH=${CLANG_PREBUILTS_PATH}"
 
-echo "== configure (device config from /proc/config.gz)"
+echo "== configure (vendor defconfig)"
 mkdir -p "${OUT_DIR}"
-cp patches/device_defconfig "${OUT_DIR}/.config"
-make ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" olddefconfig
+make ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" merge_kirin9000_defconfig
+
+echo "== export CONFIG_* as make variables (vendor build wrapper behaviour)"
+# shellcheck disable=SC2046
+export $(grep -E '^CONFIG_[A-Za-z0-9_]+=y$' "${OUT_DIR}/.config" | tr -d '\r')
 
 echo "== build"
 make -j"${JOBS}" ARCH=arm64 O="${OUT_DIR}" CLANG_PREBUILTS_PATH="${CLANG_PREBUILTS_PATH}" Image.gz Image
