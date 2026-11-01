@@ -1,4 +1,4 @@
-access_tokenid: /dev/access_token_id, token inheritance, port stubs and wiring
+access_tokenid: /dev/access_token_id, token inheritance, stubs and wiring
 
 diff --git a/drivers/accesstokenid/Kconfig b/drivers/accesstokenid/Kconfig
 new file mode 100644
@@ -286,7 +286,7 @@ diff --git a/drivers/accesstokenid/portstub.c b/drivers/accesstokenid/portstub.c
 new file mode 100644
 --- /dev/null
 +++ b/drivers/accesstokenid/portstub.c
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,62 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * portstub.c - link-time stand-ins for audio/modem providers that are not built
@@ -343,6 +343,12 @@ new file mode 100644
 +
 +long socdsp_dump_panic_log(void) { return 0; }
 +EXPORT_SYMBOL(socdsp_dump_panic_log);
++
++/* Provided by sync_debug in 4.9; the 5.10 tree drops it. */
++void sync_dump(void)
++{
++}
++EXPORT_SYMBOL(sync_dump);
 diff --git a/drivers/Kconfig b/drivers/Kconfig
 --- a/drivers/Kconfig
 +++ b/drivers/Kconfig
