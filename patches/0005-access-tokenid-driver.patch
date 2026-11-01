@@ -212,6 +212,8 @@ new file mode 100644
 +	ioctl_set_get_perm_data perm;
 +
 +	(void)file;
++	pr_info("port: token ioctl cmd=%#x size=%u tgid=%d\n",
++		cmd, _IOC_SIZE(cmd), current->tgid);
 +	switch (cmd) {
 +	case ACCESS_TOKENID_GET_TOKENID:
 +		value = token_get(current->tgid, false);
