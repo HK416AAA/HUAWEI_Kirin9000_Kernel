@@ -1,0 +1,26 @@
+binder: log system ability requests to samgr (diagnostic)
+
+--- a/drivers/android/binder.c
++++ b/drivers/android/binder.c
+@@ -4163,10 +4163,21 @@
+ #endif
+ 		return_error = binder_proc_transaction(t, target_proc, NULL);
+ 		if (return_error)
+ 			goto err_dead_proc_or_thread;
+ 	}
++	/* port: log SA requests arriving at samgr (diagnostic) */
++	if (target_proc->tsk && strstr(target_proc->tsk->comm, "samgr") &&
++	    t->buffer) {
++		u32 *pl = (u32 *)t->buffer->data;
++		u32 n = t->buffer->data_size / 4;
++		pr_info("port: sa req code=%u n=%u w0=%08x w1=%08x w2=%08x w3=%08x\n",
++			t->code, n,
++			n > 0 ? pl[0] : 0, n > 1 ? pl[1] : 0,
++			n > 2 ? pl[2] : 0, n > 3 ? pl[3] : 0);
++	}
++
+ 	if (target_thread)
+ 		binder_thread_dec_tmpref(target_thread);
+ 	binder_proc_dec_tmpref(target_proc);
+ 	if (target_node)
+ 		binder_dec_node_tmpref(target_node);
