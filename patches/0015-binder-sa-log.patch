@@ -2,7 +2,7 @@ binder: log system ability requests to samgr (diagnostic)
 
 --- a/drivers/android/binder.c
 +++ b/drivers/android/binder.c
-@@ -4163,10 +4163,21 @@
+@@ -4163,10 +4163,22 @@
  #endif
  		return_error = binder_proc_transaction(t, target_proc, NULL);
  		if (return_error)
@@ -10,13 +10,14 @@ binder: log system ability requests to samgr (diagnostic)
  	}
 +	/* port: log SA requests arriving at samgr (diagnostic) */
 +	if (target_proc->tsk && strstr(target_proc->tsk->comm, "samgr") &&
-+	    t->buffer) {
-+		u32 *pl = (u32 *)t->buffer->data;
-+		u32 n = t->buffer->data_size / 4;
-+		pr_info("port: sa req code=%u n=%u w0=%08x w1=%08x w2=%08x w3=%08x\n",
-+			t->code, n,
-+			n > 0 ? pl[0] : 0, n > 1 ? pl[1] : 0,
-+			n > 2 ? pl[2] : 0, n > 3 ? pl[3] : 0);
++	    t->buffer && t->buffer->user_data) {
++		u32 w[4] = {0};
++		int i;
++		for (i = 0; i < 4; i++)
++			(void)copy_from_user(&w[i],
++				(u8 __user *)t->buffer->user_data + i * 4, 4);
++		pr_info("port: sa req code=%u n=%zu w0=%08x w1=%08x w2=%08x w3=%08x\n",
++			t->code, t->buffer->data_size, w[0], w[1], w[2], w[3]);
 +	}
 +
  	if (target_thread)
