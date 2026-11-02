@@ -92,7 +92,7 @@ binder: HarmonyOS 7 extensions (feature set, access token, extended error)
 +		break;
 +	}
 +	case HMOS_BINDER_FEATURE_SET: {
-+		u64 features = 1; /* ACCESS_TOKENID supported */
++		u64 features = 0x5; /* H6/H7 观测值：bit0=access token, bit2=扩展能力 */
 +
 +		pr_info_once("port: binder FEATURE_SET queried\n");
 +		if (copy_to_user(ubuf, &features, sizeof(features))) {
