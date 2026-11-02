@@ -1,16 +1,16 @@
-binder: log SA requests to samgr via kernel buffer copy
+binder: log SA requests to samgr before enqueue (safe)
 
 --- a/drivers/android/binder.c
 +++ b/drivers/android/binder.c
-@@ -4163,10 +4163,24 @@
- #endif
- 		return_error = binder_proc_transaction(t, target_proc, NULL);
- 		if (return_error)
- 			goto err_dead_proc_or_thread;
+@@ -4070,10 +4070,24 @@
+ 			return_error_param = -EINVAL;
+ 			return_error_line = __LINE__;
+ 			goto err_bad_object_type;
+ 		}
  	}
-+	/* port: log SA requests arriving at samgr (diagnostic) */
-+	if (target_proc->tsk && strstr(target_proc->tsk->comm, "samgr") &&
-+	    t->buffer) {
++	/* port: log SA requests to samgr before the buffer becomes visible */
++	if (target_proc && target_proc->tsk &&
++	    strstr(target_proc->tsk->comm, "samgr") && t->buffer) {
 +		u32 w[12] = {0};
 +		int i;
 +		for (i = 0; i < 12; i++)
@@ -22,8 +22,8 @@ binder: log SA requests to samgr via kernel buffer copy
 +			w[6], w[7], w[8], w[9], w[10], w[11]);
 +	}
 +
- 	if (target_thread)
- 		binder_thread_dec_tmpref(target_thread);
- 	binder_proc_dec_tmpref(target_proc);
- 	if (target_node)
- 		binder_dec_node_tmpref(target_node);
+ 	if (t->buffer->oneway_spam_suspect)
+ 		tcomplete->type = BINDER_WORK_TRANSACTION_ONEWAY_SPAM_SUSPECT;
+ 	else
+ 		tcomplete->type = BINDER_WORK_TRANSACTION_COMPLETE;
+ 	t->work.type = BINDER_WORK_TRANSACTION;
