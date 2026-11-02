@@ -1,4 +1,4 @@
-binder: log system ability requests to samgr (12 words)
+binder: log SA requests to samgr via kernel buffer copy
 
 --- a/drivers/android/binder.c
 +++ b/drivers/android/binder.c
@@ -10,12 +10,12 @@ binder: log system ability requests to samgr (12 words)
  	}
 +	/* port: log SA requests arriving at samgr (diagnostic) */
 +	if (target_proc->tsk && strstr(target_proc->tsk->comm, "samgr") &&
-+	    t->buffer && t->buffer->user_data) {
++	    t->buffer) {
 +		u32 w[12] = {0};
 +		int i;
 +		for (i = 0; i < 12; i++)
-+			(void)copy_from_user(&w[i],
-+				(u8 __user *)t->buffer->user_data + i * 4, 4);
++			(void)binder_alloc_copy_from_buffer(&target_proc->alloc,
++				&w[i], t->buffer, i * 4, 4);
 +		pr_info("port: sa req code=%u n=%zu w=%08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x\n",
 +			t->code, t->buffer->data_size,
 +			w[0], w[1], w[2], w[3], w[4], w[5],
