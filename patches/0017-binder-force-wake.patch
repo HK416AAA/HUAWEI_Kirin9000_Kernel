@@ -1,0 +1,26 @@
+binder: force-wake all target threads after enqueue (OpenHarmony bring-up)
+
+diff --git a/drivers/android/binder.c b/drivers/android/binder.c
+index 8a14aa6..4c79b4b 100644
+--- a/drivers/android/binder.c
++++ b/drivers/android/binder.c
+@@ -3338,6 +3338,19 @@ static int binder_proc_transaction(struct binder_transaction *t,
+ #else
+ 		binder_wakeup_thread_ilocked(proc, thread, !oneway /* sync */);
+ #endif
++		/* port: the vendor wakeup heuristics skip threads that already have
++		 * queued todo or a transaction stack, which can leave work stranded
++		 * while every thread sleeps. Wake all waiters; spurious wakeups are
++		 * harmless because binder_thread_read rechecks for work.
++		 */
++		{
++			struct rb_node *n;
++			for (n = rb_first(&proc->threads); n != NULL; n = rb_next(n)) {
++				struct binder_thread *waiter =
++					rb_entry(n, struct binder_thread, rb_node);
++				wake_up_interruptible(&waiter->wait);
++			}
++		}
+ 	}
+ 
+ 
